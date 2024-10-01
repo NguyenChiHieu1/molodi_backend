@@ -1,56 +1,61 @@
 import { v2 as cloudinary } from 'cloudinary'
-import songModel from '../models/songModel.js';
+import Song from '../models/songModel.js';
+
 
 const addSong = async (req, res) => {
     try {
-        const { name, desc, album } = req.body; // Sử dụng destructuring để lấy dữ liệu
+        const artist = req.user._id;
+        const { title } = req.body;
 
-        // Kiểm tra xem các trường yêu cầu có tồn tại không
-        if (!name || !desc || !album || !req.files.audio || !req.files.image) {
+        if (!title || !artist || !req.files.audio || !req.files.image) {
             return res.status(400).json({
                 success: false,
                 message: "Missing required fields"
             });
         }
 
-        const audioFile = req.files.audio[0]; // Kiểm tra nếu req.files.audio tồn tại
+        const audioFile = req.files.audio[0];
         const imageFile = req.files.image[0];
 
-        // Upload file audio và image lên Cloudinary
         const audioUpload = await cloudinary.uploader.upload(audioFile.path, {
             resource_type: "video",
             folder: "songs"
         });
+
         const imageUpload = await cloudinary.uploader.upload(imageFile.path, {
             resource_type: "image",
             folder: "album_covers"
         });
-        const duration = `${Math.floor(audioUpload.duration / 60)}:${Math.floor(audioUpload.duration % 60)}`
 
-        const songData = {
-            name,
-            desc,
-            album,
-            file: audioUpload.secure_url,
-            image: imageUpload.secure_url,
-            duration
-        }
+        const duration = `${Math.floor(audioUpload.duration / 60)}:${Math.floor(audioUpload.duration % 60)}`;
+        const song = new Song();
 
-        const song = songModel(songData);
+
+        song.title = title
+        song.artist = artist
+        if (req.body.album) song.album = req.body.album
+        song.category = req.body.category || ""
+        song.audio = audioUpload.secure_url
+        song.duration = duration
+        song.image = imageUpload.secure_url
+        song.status = 'pending'
+
+
         await song.save();
-        // Trả về phản hồi với URL của các tệp tải lên
+
         res.status(200).json({
             success: true,
-            message: "Song Added"
+            message: "Song added successfully!",
+            data: song
         });
     } catch (error) {
-        console.error("Error uploading song:", error);
         res.status(500).json({
             success: false,
-            message: "Internal server error"
+            message: error.message
         });
     }
 };
+
 
 const listSong = async (req, res) => {
     try {

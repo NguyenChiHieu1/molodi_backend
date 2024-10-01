@@ -1,12 +1,12 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
-const albumSchema = new mongoose.Schema({
+const AlbumSchema = new mongoose.Schema({
     name: { type: String, required: true },
-    desc: { type: String, required: true },
-    bgColour: { type: String, required: true },
-    image: { type: String, required: true }
-})
+    artist: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Nghệ sỹ
+    cover_image: { type: String }, // URL ảnh bìa album
+    status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' }, // Trạng thái album
+    songs: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Song' }], // Danh sách bài hát,
+    bg_colour: { type: String }
+}, { timestamps: true });
 
-const albumModel = mongoose.models.album || mongoose.model("album", albumSchema);
-
-export default albumModel;
+export default mongoose.model('Album', AlbumSchema);

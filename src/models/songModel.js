@@ -1,14 +1,16 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
-const songSchema = new mongoose.Schema({
-    name: { type: String, require: true },
-    desc: { type: String, require: true },
-    album: { type: String, require: true },
-    image: { type: String, require: true },
-    file: { type: String, require: true },
-    duration: { type: String, require: true }
-})
+const SongSchema = new mongoose.Schema({
+    title: { type: String, required: true },
+    artist: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    album: { type: mongoose.Schema.Types.ObjectId, ref: 'Album' }, // Liên kết với Album
+    category: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }], // Liên kết với danh mục
+    duration: { type: String }, // Thời gian bài hát (phút)
+    status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+    downloadCount: { type: Number, default: 0 }, // Số lượt tải về
+    viewCount: { type: Number, default: 0 }, // Số lượt nghe
+    image: { type: String, required: true },
+    audio: { type: String, required: true },
+}, { timestamps: true });
 
-const songModel = mongoose.models.song || mongoose.model("song", songSchema);
-
-export default songModel;
+export default mongoose.model('Song', SongSchema);
