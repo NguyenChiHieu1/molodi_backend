@@ -1,12 +1,12 @@
 import User from "../models/userModel.js";
-import Libarary from "../models/libraryModel.js";
 import crypto from "crypto";
 import sendMail from "../config/sendMail.js";
 import { v2 as cloudinary } from 'cloudinary'
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
-
-const prefix = `https://res.cloudinary.com/${process.env.CLOUDINARY_NAME}/image/upload/`;
+import Library from "../models/libraryModel.js";
+import Playlist from "../models/playlistModel.js";
+// const prefix = `https://res.cloudinary.com/${process.env.CLOUDINARY_NAME}/image/upload/`;
 
 export const register = async (req, res) => {
     try {
@@ -31,6 +31,8 @@ export const register = async (req, res) => {
 
         if (!newUser) throw new Error('User creation failed!!!');
 
+        // tạo library
+        await Library.create({ user: newUser._id });
 
         // Gửi email xác thực cho người dùng
         // const verificationLink = `${process.env.CLIENT}/user/verify-email/${verificationToken}`;
@@ -66,6 +68,7 @@ export const register = async (req, res) => {
     }
 }
 
+//chưa hoàn thiện
 export const verifyEmail = async (req, res) => {
     try {
         const { verificationToken } = req.params;
@@ -103,51 +106,54 @@ export const login = async (req, res) => {
         const { email, password } = req.body;
         const userCheck = await User.findOne({ email: email }).populate("roles", "name");
         // console.log(userCheck)
-        if (!userCheck) throw new Error('Not find user account')
+        if (!userCheck) return res.status(400).json({
+            success: true,
+            message: 'Not find user account'
+        })
         const checkPassWord = await bcrypt.compare(password, userCheck.password);
         if (checkPassWord) {
-            const accessToken = await jwt.sign({ _id: userCheck._id, roles: userCheck.roles.name }, process.env.JWT_SECRET, { expiresIn: '2d' })
+            // console.log(userCheck)
+            const accessToken = await jwt.sign({ _id: userCheck._id, roles: userCheck.roles.name, name: userCheck.username }, process.env.JWT_SECRET, { expiresIn: '2d' })
             return res.status(200).json({
                 success: true,
-                token: accessToken
+                token: accessToken,
+                roles: userCheck.roles.name
             })
         }
-        throw new Error("Incorrect password");
-    } catch (error) {
         return res.status(400).json({
+            success: true,
+            message: "Incorrect password"
+        })
+    } catch (error) {
+        return res.status(500).json({
             success: false,
-            messages: error.message
+            message: error.message
         })
     }
 };
 
+//manager-profile: cá nhân -- chỉ đăng nhập thành công mới thay đổi thông tin tài khoản. admin ko thể
 export const updateUser = async (req, res) => {
     try {
         const { _id } = req.user;
-        let { passwordNew, passwordOld } = req.body
+        // const _id = req.params.id
+        let { password } = req.body
         let image = req.file;
-        if (Object.keys(req.body).length === 0) throw new Error("No input value")
+        if (Object.keys(req.body).length === 0)
+            return res.status(400).json({
+                success: false,
+                message: "No input value"
+            })
         const userUpdate = await User.findById(_id);
         // console.log(userUpdate)
         if (!userUpdate) throw new Error('User not found')
         // 
         let updateData = { ...req.body };
-        if (passwordNew && passwordOld) {
-            // console.log("passwordNew-" + passwordNew + "-passwordOld-" + passwordOld)
-            // Kiểm tra xem mật khẩu cũ có khớp với mật khẩu hiện tại không
-            const isMatch = await bcrypt.compare(passwordOld, userUpdate.password)
-            if (!isMatch) {
-                return res.status(400).json({
-                    success: false,
-                    messages: "Old password is incorrect!"
-                });
-            }
-
+        if (password) {
             // Băm mật khẩu mới
-            updateData.password = passwordNew;
+            const salt = await bcrypt.genSalt(10);
+            updateData.password = await bcrypt.hash(password, salt);
         }
-        //
-
 
         if (image) {
             const upload = await cloudinary.uploader.upload(image.path, {
@@ -156,6 +162,7 @@ export const updateUser = async (req, res) => {
             });
             // console.log(upload)
             if (userUpdate.profile_image) {
+                const prefix = `https://res.cloudinary.com/${process.env.CLOUDINARY_NAME}/image/upload/`;
 
                 let publicId = userUpdate.profile_image.replace(prefix, '');
                 publicId = publicId.replace(/v\d+\/(.+)\.\w+$/, '$1');
@@ -164,6 +171,8 @@ export const updateUser = async (req, res) => {
             }
             updateData.profile_image = upload.secure_url;
         }
+        // bảo mật:
+        updateData.roles = userUpdate.roles;
         const response = await User.findByIdAndUpdate(_id, updateData, { new: true }).select('-role -password')
         if (!response) throw new Error('Error update info account')
         return res.status(200).json({
@@ -182,32 +191,58 @@ export const updateUser = async (req, res) => {
     }
 }
 
-export const deleteUser = async (req, res) => {
+export const updateUserLeader = async (req, res) => {
     try {
-        const uid = req.params.uid;
-        // console.log(uid)
-        const user = await User.findById(uid).select('-password -role');
-        if (!user) return res.status(404).json({
-            success: false,
-            messages: "No found account"
-        })
-        const deleteUser = await User.findByIdAndDelete(uid);
-        // console.log(deleteUser)
-        if (!deleteUser)
+        const _id = req.params.id
+        let { password } = req.body
+        let image = req.file;
+        if (Object.keys(req.body).length === 0)
             return res.status(400).json({
                 success: false,
-                messages: "Delete account not success"
+                message: "No input value"
             })
-        if (user.profile_image) {
-            let publicId = deleteUser.profile_image.replace(prefix, '');
-            publicId = publicId.replace(/v\d+\/(.+)\.\w+$/, '$1');
-            const deleteImage = await cloudinary.uploader.destroy(publicId, { resource_type: "image" })
-            if (!deleteImage) throw new Error("Delete Profile_Image Old Not Success!!!")
+        const userUpdate = await User.findById(_id);
+        // console.log(userUpdate)
+        if (!userUpdate) throw new Error('User not found')
+        // 
+        let updateData = { ...req.body };
+        if (password) {
+            const salt = await bcrypt.genSalt(10);
+            updateData.password = await bcrypt.hash(password, salt);
         }
+
+        if (image) {
+            const upload = await cloudinary.uploader.upload(image.path, {
+                resource_type: "image",
+                folder: "users"
+            });
+            // console.log(upload)
+            if (userUpdate.profile_image) {
+                const prefix = `https://res.cloudinary.com/${process.env.CLOUDINARY_NAME}/image/upload/`;
+
+                let publicId = userUpdate.profile_image.replace(prefix, '');
+                publicId = publicId.replace(/v\d+\/(.+)\.\w+$/, '$1');
+                const deleteImage = await cloudinary.uploader.destroy(publicId, { resource_type: "image" })
+                if (!deleteImage) throw new Error("Delete Profile_Image Old Not Success!!!")
+            }
+            updateData.profile_image = upload.secure_url;
+        }
+        // bảo mật:
+        updateData.roles = req.body.roles;
+        const response = await User.findByIdAndUpdate(_id, updateData, { new: true }).select('-role -password')
+        if (!response) throw new Error('Error update info account')
+
+        // 
+        const findLibrary = await Library.findOne({ user: _id })
+        if (!findLibrary) {
+            await Library.create({ user: _id });
+        }
+
         return res.status(200).json({
             success: true,
-            messages: `Account user with email ${user.email} delete success`
+            messages: 'Update successfully'
         })
+
     } catch (error) {
         return res.status(400).json({
             success: false,
@@ -215,6 +250,66 @@ export const deleteUser = async (req, res) => {
         })
     }
 }
+
+export const deleteUser = async (req, res) => {
+    try {
+        const uid = req.params.uid;
+
+        // Tìm kiếm người dùng
+        const user = await User.findById(uid).select('-password -role');
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                messages: "No account found"
+            });
+        }
+
+        // Xóa người dùng
+        const deleteUser = await User.findByIdAndDelete(uid);
+        if (!deleteUser) {
+            return res.status(400).json({
+                success: false,
+                messages: "Delete account not successful"
+            });
+        }
+
+        // Xóa ảnh hồ sơ nếu có
+        if (user.profile_image) {
+            const prefixxx = `https://res.cloudinary.com/${process.env.CLOUDINARY_NAME}/image/upload/`;
+            let publicId = deleteUser.profile_image.replace(prefixxx, '');
+            publicId = publicId.replace(/v\d+\/(.+)\.\w+$/, '$1');
+
+            // Xóa ảnh khỏi Cloudinary
+            const deleteImage = await cloudinary.uploader.destroy(publicId, { resource_type: "image" });
+            if (deleteImage.result !== "ok") {
+                throw new Error("Failed to delete old profile image!");
+            }
+        }
+
+        // Tìm và xóa tất cả thư viện liên quan đến người dùng
+        const findLibrary = await Library.findOne({ user: uid });
+        if (findLibrary) {
+            await Library.deleteMany({ user: uid });
+        }
+
+        // Tìm và xóa tất cả playlist liên quan đến người dùng
+        const findPlaylist = await Playlist.findOne({ user: uid });
+        if (findPlaylist) {
+            await Playlist.deleteMany({ user: uid });
+        }
+
+        return res.status(200).json({
+            success: true,
+            messages: `Account with email ${user.email} deleted successfully`
+        });
+    } catch (error) {
+        return res.status(400).json({
+            success: false,
+            messages: error.message
+        });
+    }
+};
+
 
 export const createUser = async (req, res) => {
     try {
@@ -251,5 +346,113 @@ export const createUser = async (req, res) => {
             success: false,
             messages: error.message
         })
+    }
+}
+
+export const getUsers = async (req, res) => {
+    try {
+        // Sao chép các tham số truy vấn từ req.query
+        const queries = { ...req.query };
+
+        // Loại bỏ các trường đặc biệt như limit, sort, page, fields
+        const excludeFields = ['limit', 'sort', 'page', 'fields'];
+        excludeFields.forEach(field => delete queries[field]);
+
+        // Chuyển đổi các tham số so sánh (gte, gt, lt, lte) thành định dạng MongoDB
+        let queryString = JSON.stringify(queries);
+        queryString = queryString.replace(/\b(gte|gt|lt|lte)\b/g, matchedEl => `$${matchedEl}`);
+        const formattedQueries = JSON.parse(queryString);
+
+        formattedQueries._id = { $ne: '6703aabbfcb17cea9b3fc1aa' };
+        if (queries?.username) formattedQueries.username = { $regex: queries.username, $options: 'i' };
+
+        // Tạo truy vấn cơ bản cho người dùng
+        let queryCommand = User.find(formattedQueries).populate("roles", "name");
+
+        // Xử lý sắp xếp
+        if (req.query.sort) {
+            const sortBy = req.query.sort.split(',').join(' ');
+            queryCommand = queryCommand.sort(sortBy);
+        } else {
+            queryCommand = queryCommand.sort({ createdAt: -1 }); // Mặc định sắp xếp theo ngày tạo mới nhất
+        }
+
+        // Giới hạn các trường hiển thị nếu có yêu cầu
+        if (req.query.fields) {
+            const fields = req.query.fields.split(',').join(' ');
+            queryCommand = queryCommand.select(fields);
+        }
+
+        // Xử lý phân trang
+        const page = +req.query.page || 1;
+        const limit = +req.query.limit || process.env.LIMIT_USERS || 10; // Mặc định 10 người dùng mỗi trang
+        const skip = (page - 1) * limit;
+        queryCommand = queryCommand.skip(skip).limit(limit);
+
+        // Thực thi truy vấn
+        const listUsers = await queryCommand.exec();
+        const counts = await User.countDocuments(formattedQueries); // Đếm tổng số người dùng
+
+        // Trả kết quả về client
+        return res.status(200).json({
+            success: true,
+            counts: counts, // Tổng số người dùng
+            currentPage: page, // Trang hiện tại
+            totalPage: Math.ceil(counts / limit), // Tổng số trang
+            data: listUsers, // Danh sách người dùng
+        });
+        // 6703aabbfcb17cea9b3fc1aa
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+export const findAccound = async (req, res) => {
+    try {
+        const id = req.params.id
+        const findUser = await User.findById(id).populate({ path: 'roles', select: 'name' });
+        if (!findUser) throw new Error("Not found song")
+        return res.status(200).json({
+            success: true,
+            data: findUser
+        });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message })
+    }
+}
+
+export const getArtist = async (req, res) => {
+    try {
+        const findUser = await User.find({
+            roles: "66fba3a49365526bc7e9bd95",
+            status: "approved"
+        });
+        if (!findUser) throw new Error("Not found song")
+        return res.status(200).json({
+            success: true,
+            data: findUser
+        });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message })
+
+    }
+}
+
+export const addHistoryListenSong = async () => {
+    try {
+        const id = req.user._id;
+        const findUser = await User.findById(id);
+        if (!findUser) throw new Error("Not found user")
+        findUser.historyListenSong = req.body.historyListenSong;
+        await findUser.save()
+        return res.status(200).json({
+            success: true
+        });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message })
+
     }
 }

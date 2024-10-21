@@ -8,9 +8,10 @@ const authorMiddleware = (allowedRoles) => {
         }
 
         const userRoles = await userModel.findById(user._id).populate('roles', 'name'); // Lấy roles từ user
-        const userRoleNames = userRoles.roles.map(role => role.name); // Lấy tên role
+        // console.log(userRoles)
 
-        const hasRole = userRoleNames.some(role => allowedRoles.includes(role)); // Kiểm tra nếu có role phù hợp
+        const hasRole = await allowedRoles.includes(userRoles.roles.name); // Kiểm tra nếu có role phù hợp
+        // console.log(hasRole)
 
         if (!hasRole) {
             return res.status(403).json({ message: 'Access denied' });

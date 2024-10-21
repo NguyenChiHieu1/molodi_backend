@@ -5,6 +5,7 @@ import {
     createCategory,
     getAllCategories,
     getCategoryById,
+    getCategories,
     updateCategory,
     deleteCategory
 } from '../controllers/categoryController.js';
@@ -13,18 +14,19 @@ import author from "../middleware/author.js"
 const categoryRouter = express.Router();
 
 // Tạo danh mục mới
-categoryRouter.post('/', authen, author(["admin"]), createCategory);
+categoryRouter.post('/', authen, author(["leader"]), createCategory);
 
 // Lấy tất cả danh mục
-categoryRouter.get('/', authen, author(["admin"]), getAllCategories);
+categoryRouter.get('/', getAllCategories);
+categoryRouter.get('/categories', getCategories);
 
 // Lấy danh mục theo ID
-// categoryRouter.get('/:id', authen, author(["admin"]), getCategoryById);
+categoryRouter.get('/:id', authen, author(["leader"]), getCategoryById);
 
 // Cập nhật danh mục theo ID
-categoryRouter.put('/:id', authen, author(["admin"]), updateCategory);
+categoryRouter.put('/:id', authen, author(["leader"]), updateCategory);
 
 // Xóa danh mục theo ID
-categoryRouter.delete('/:id', authen, author(["admin"]), deleteCategory);
+categoryRouter.delete('/:id', authen, author(["leader"]), deleteCategory);
 
 export default categoryRouter;

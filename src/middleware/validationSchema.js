@@ -17,7 +17,7 @@ const registerValidationSchema = Joi.object({
         'string.empty': 'Password cannot be empty.',
         'any.required': 'Password is required.',
     }),
-    roles: Joi.array().items(Joi.string()).optional()
+    roles: Joi.string().optional()
 });
 
 const loginValidationSchema = Joi.object({
@@ -61,22 +61,22 @@ const loginValidationSchema = Joi.object({
 // });
 
 // Validation schema for creating an album
-const createAlbumValidationSchema = Joi.object({
-    name: Joi.string().trim().required().messages({
-        'string.empty': 'Album name cannot be empty.',
-        'any.required': 'Album name is required.',
-    }),
-    artist: Joi.string().trim().required().messages({
-        'string.empty': 'Artist name cannot be empty.',
-        'any.required': 'Artist name is required.',
-    }),
-    cover_image: Joi.string().uri().trim().optional().messages({
-        'string.uri': 'Invalid cover image URL format.',
-    }),
-    songs: Joi.array().items(Joi.string()).messages({
-        'array.base': 'Songs must be an array of song IDs.',
-    }),
-});
+// const addAlbumValidationSchema = Joi.object({
+//     name: Joi.string().trim().required().messages({
+//         'string.empty': 'Album name cannot be empty.',
+//         'any.required': 'Album name is required.',
+//     }),
+//     artist: Joi.string().trim().required().messages({
+//         'string.empty': 'Artist name cannot be empty.',
+//         'any.required': 'Artist name is required.',
+//     }),
+//     image: Joi.string().uri().trim().optional().messages({
+//         'string.uri': 'Invalid cover image URL format.',
+//     }),
+//     songs: Joi.array().items(Joi.string()).messages({
+//         'array.base': 'Songs must be an array of song IDs.',
+//     }),
+// });
 
 // Validation schema for creating a category
 const createCategoryValidationSchema = Joi.object({
@@ -103,7 +103,7 @@ export {
     registerValidationSchema,
     loginValidationSchema,
     // createSongValidationSchema,
-    createAlbumValidationSchema,
+    // addAlbumValidationSchema,
     createCategoryValidationSchema,
     createRoleValidationSchema
 };

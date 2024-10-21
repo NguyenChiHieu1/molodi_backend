@@ -8,8 +8,8 @@ import author from '../middleware/author.js';
 const roleRouter = express.Router();
 
 roleRouter.get('/', getAllRoles);
-roleRouter.post('/', authen, author(["admin"]), validate(createRoleValidationSchema), createRole);
-roleRouter.put('/:rid', authen, author(["admin"]), updateRole);
-roleRouter.delete('/:rid', authen, author(["admin"]), deleteRole);
+roleRouter.post('/', authen, author(["leader"]), validate(createRoleValidationSchema), createRole);
+roleRouter.put('/:rid', authen, author(["leader"]), updateRole);
+roleRouter.delete('/:rid', authen, author(["leader"]), deleteRole);
 
 export default roleRouter;

@@ -8,6 +8,8 @@ import albumRouter from './src/routes/albumRoute.js';
 import userRouter from './src/routes/userRoute.js';
 import roleRouter from './src/routes/roleRoute.js';
 import categoryRouter from './src/routes/categoryRoute.js';
+import playlistRouter from './src/routes/playlistRoute.js';
+import libraryRouter from './src/routes/libraryRoute.js';
 
 //app config
 dotenv.config();
@@ -28,6 +30,8 @@ app.use("/api/user", userRouter)
 app.use("/api/song", songRouter)
 app.use("/api/album", albumRouter)
 app.use("/api/category", categoryRouter)
+app.use("/api/playlist", playlistRouter)
+app.use("/api/library", libraryRouter)
 
 app.get('/', (req, res) => res.send("API Working"))
 

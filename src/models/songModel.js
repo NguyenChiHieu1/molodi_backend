@@ -3,7 +3,6 @@ import mongoose from 'mongoose';
 const SongSchema = new mongoose.Schema({
     title: { type: String, required: true },
     artist: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    album: { type: mongoose.Schema.Types.ObjectId, ref: 'Album' }, // Liên kết với Album
     category: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }], // Liên kết với danh mục
     duration: { type: String }, // Thời gian bài hát (phút)
     status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
