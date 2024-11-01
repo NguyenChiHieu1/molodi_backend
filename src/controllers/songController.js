@@ -38,7 +38,7 @@ export const addSong = async (req, res) => {
             folder: "album_covers"
         });
 
-        const duration = `${Math.floor(audioUpload.duration / 60)}:${Math.floor(audioUpload.duration % 60)}`;
+        const duration = `${Math.floor(audioUpload.duration / 60).toString().padStart(2, '0')}:${Math.floor(audioUpload.duration % 60).toString().padStart(2, '0')}`;
         const song = new Song();
 
         song.title = title;
@@ -292,7 +292,6 @@ export const removeSong = async (req, res) => {
 export const increaseViewSong = async (req, res) => {
     try {
         const song = await Song.findById(req.params.sid).populate({ path: 'artist', select: 'username' }) // Liên kết với artist (User)
-            .populate({ path: 'album', select: 'title' }) // Liên kết với album
             .populate({ path: 'category', select: 'name' }); // Liên kết với category
         if (!song) {
             return res.status(404).json({
@@ -345,3 +344,31 @@ export const increaseDownloadSong = async (req, res) => {
         });
     }
 };
+
+
+export const songUpdateAll = async (req, res) => {
+    try {
+        const songs = await Song.find();
+
+        for (let song of songs) {
+            const [minutes, seconds] = song.duration.split(':').map(Number);
+
+            const normalizedDuration = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+            if (song.duration !== normalizedDuration) {
+                song.duration = normalizedDuration;
+                await song.save();
+            }
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "All song durations have been normalized",
+        });
+    } catch (error) {
+        return res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+}

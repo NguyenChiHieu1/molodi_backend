@@ -6,6 +6,8 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import Library from "../models/libraryModel.js";
 import Playlist from "../models/playlistModel.js";
+import Album from "../models/albumModel.js";
+import Song from "../models/songModel.js";
 // const prefix = `https://res.cloudinary.com/${process.env.CLOUDINARY_NAME}/image/upload/`;
 
 export const register = async (req, res) => {
@@ -429,7 +431,7 @@ export const getArtist = async (req, res) => {
         const findUser = await User.find({
             roles: "66fba3a49365526bc7e9bd95",
             status: "approved"
-        });
+        }).select('username profile_image');
         if (!findUser) throw new Error("Not found song")
         return res.status(200).json({
             success: true,
@@ -454,5 +456,104 @@ export const addHistoryListenSong = async () => {
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message })
 
+    }
+}
+
+export const getAlbumSongArtist = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const findAcc = await User.findById(id).populate({
+            path: 'roles',
+            select: 'name'
+        }).select(
+            'username profile_image'
+        );
+
+        if (findAcc.roles.name !== "artist") {
+            return res.status(401).json({
+                success: false,
+                message: "Not found artist or Are not artist!!!"
+            })
+        }
+
+        const findAlbums = await Album.find({ artist: id });
+        const findSongs = await Song.find({ artist: id });
+        return res.status(200).json({
+            success: true,
+            data: {
+                artist: findAcc,
+                albums: findAlbums,
+                songs: findSongs
+            }
+        });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message })
+    }
+}
+
+
+export const checkOrCreateLibraryForAllUsers = async (req, res) => {
+    try {
+        // Lấy tất cả người dùng
+        const users = await User.find(); // Có thể thêm điều kiện nếu cần
+
+        // Biến để lưu trữ kết quả
+        const results = [];
+
+        for (const user of users) {
+            let library = await Library.findOne({ user: user._id });
+
+            if (!library) {
+                // Nếu không có, tạo mới một thư viện cho user
+                library = new Library({
+                    user: user._id,
+                    songs: [],
+                    playlists: [],
+                    albums: [],
+                    artistsFollow: []
+                });
+
+                await library.save(); // Lưu thư viện mới vào cơ sở dữ liệu
+                results.push({
+                    user: user._id,
+                    message: 'Library created successfully.',
+                    data: library
+                });
+            } else {
+                // Nếu đã có thư viện, ghi lại kết quả
+                results.push({
+                    user: user._id,
+                    message: 'Library already exists.',
+                    data: library
+                });
+            }
+        }
+
+        // Trả về kết quả
+        return res.status(200).json({
+            success: true,
+            results // Trả về tất cả kết quả
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message // Trả về thông báo lỗi
+        });
+    }
+};
+
+export const getUserInfo = async (req, res) => {
+    try {
+        const id = req.user._id;
+        const findAcc = await User.findById(id).select(
+            'username profile_image email'
+        );
+
+        return res.status(200).json({
+            success: true,
+            data: findAcc
+        });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message })
     }
 }

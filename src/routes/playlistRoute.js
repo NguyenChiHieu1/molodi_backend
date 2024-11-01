@@ -8,7 +8,7 @@ const playlistRouter = express.Router();
 playlistRouter.put('/push', authen, addSongToPlaylist);
 playlistRouter.put('/remove', authen, removeSongFromPlaylist);
 playlistRouter.post('/add', authen, upload.single('image'), createPlaylist);
-playlistRouter.get('/list', authen, getPlaylist);
+playlistRouter.get('/list', getPlaylist);
 playlistRouter.get('/all-public', getPlaylistPublic);
 playlistRouter.get('/:id', authen, getPlaylistId);
 playlistRouter.put('/:id', authen, upload.single('image'), updatePlaylist);

@@ -1,5 +1,5 @@
 import Library from '../models/libraryModel.js';
-import Playlist from '../models/playlistModel.js';
+// import Playlist from '../models/playlistModel.js';
 
 // READ: Lấy thông tin thư viện của người dùng
 export const getLibrary = async (req, res) => {
@@ -7,16 +7,27 @@ export const getLibrary = async (req, res) => {
         const userId = req.user._id;
 
         const library = await Library.findOne({ user: userId })
-            .populate('songs')
             .populate({
-                path: 'playlists',
+                path: 'songs.song',
+                select: 'title artist image duration'
+            })
+            .populate({
+                path: 'playlists.playlist',
+                select: 'name description image',
                 populate: {
                     path: 'user',
                     select: 'username'
                 }
             })
-            .populate('albums')
-            .populate('artistsFollow', 'username _id profile_image')
+            .populate({
+                path: 'albums.album',
+                select: 'title artist image releaseDate'
+            })
+            .populate({
+                path: 'artistsFollow.artist',
+                select: 'username profile_image _id'
+            })
+        // .lean();
 
         if (!library) {
             return res.status(404).json({
@@ -36,6 +47,7 @@ export const getLibrary = async (req, res) => {
         });
     }
 };
+
 
 // UPDATE: Cập nhật thư viện của người dùng
 export const updateLibrary = async (req, res) => {
@@ -52,10 +64,61 @@ export const updateLibrary = async (req, res) => {
         }
 
         // Cập nhật thư viện
-        library.songs = songs || library.songs;
-        library.playlists = playlists || library.playlists;
-        library.albums = albums || library.albums;
-        library.artistsFollow = artistsFollow || library.artistsFollow;
+        if (songs) {
+            // Kiểm tra nếu không phải là mảng, trả về lỗi
+            if (!Array.isArray(songs)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Songs must be an array'
+                });
+            }
+            library.songs = songs.map(song => ({
+                song,
+                addedAt: Date.now() // Cập nhật thời gian thêm
+            }));
+        }
+
+        if (playlists) {
+            // Kiểm tra nếu không phải là mảng, trả về lỗi
+            if (!Array.isArray(playlists)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Playlists must be an array'
+                });
+            }
+            library.playlists = playlists.map(playlist => ({
+                playlist,
+                addedAt: Date.now() // Cập nhật thời gian thêm
+            }));
+        }
+
+        if (albums) {
+            // Kiểm tra nếu không phải là mảng, trả về lỗi
+            if (!Array.isArray(albums)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Albums must be an array'
+                });
+            }
+            library.albums = albums.map(album => ({
+                album,
+                addedAt: Date.now() // Cập nhật thời gian thêm
+            }));
+        }
+
+        if (artistsFollow) {
+            // Kiểm tra nếu không phải là mảng, trả về lỗi
+            if (!Array.isArray(artistsFollow)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ArtistsFollow must be an array'
+                });
+            }
+            library.artistsFollow = artistsFollow.map(artist => ({
+                artist,
+                addedAt: Date.now() // Cập nhật thời gian thêm
+            }));
+        }
 
         await library.save();
 
@@ -70,7 +133,7 @@ export const updateLibrary = async (req, res) => {
             message: error.message
         });
     }
-};
+}
 
 // DELETE: Xóa thư viện của người dùng
 export const deleteLibrary = async (req, res) => {
@@ -94,8 +157,9 @@ export const deleteLibrary = async (req, res) => {
 
 export const pushLibrary = async (req, res) => {
     try {
-        const userId = req.user._id;
-        const { song, album, artist, playlist } = req.body
+        const userId = req.user._id; // Lấy ID người dùng từ req
+        const { song, album, artist, playlist } = req.body; // Lấy thông tin từ body
+
         const library = await Library.findOne({ user: userId });
         if (!library) {
             return res.status(404).json({
@@ -103,54 +167,58 @@ export const pushLibrary = async (req, res) => {
                 message: 'Library not found'
             });
         }
-        // Thêm album mới vào thư viện
+
+        // Thêm bài hát vào thư viện
         if (song) {
-            const checkSong = library.songs.some(item => item.toString() === song.toString());
+            const checkSong = library.songs.some(item => item.song.toString() === song.toString());
             if (!checkSong) {
-                library.songs.push(song); // Chỉ thêm khi chưa có trong danh sách
+                library.songs.push({ song, addedAt: new Date() }); // Thêm với thời gian
             } else {
                 return res.status(400).json({
                     success: false,
                     message: 'Song already exists in the library!'
-                })
+                });
             }
         }
 
+        // Thêm album vào thư viện
         if (album) {
-            const checkAlbum = library.albums.some(item => item.toString() === album.toString());
+            const checkAlbum = library.albums.some(item => item.album.toString() === album.toString());
             if (!checkAlbum) {
-                library.albums.push(album);
+                library.albums.push({ album, addedAt: new Date() }); // Thêm với thời gian
             } else {
                 return res.status(400).json({
                     success: false,
                     message: 'Album already exists in the library!'
-                })
+                });
             }
         }
 
+        // Thêm nghệ sĩ vào danh sách theo dõi
         if (artist) {
-            const checkArtist = library.artistsFollow.some(item => item.toString() === artist.toString());
+            const checkArtist = library.artistsFollow.some(item => item.artist.toString() === artist.toString());
             if (!checkArtist) {
-                library.artistsFollow.push(artist);
+                library.artistsFollow.push({ artist, addedAt: new Date() }); // Thêm với thời gian
             }
         }
 
+        // Thêm playlist vào thư viện
         if (playlist) {
-            const checkPlaylist = library.playlists.some(item => item.toString() === playlist.toString());
+            const checkPlaylist = library.playlists.some(item => item.playlist.toString() === playlist.toString());
             if (!checkPlaylist) {
-                library.playlists.push(playlist);
+                library.playlists.push({ playlist, addedAt: new Date() }); // Thêm với thời gian
             } else {
                 return res.status(400).json({
                     success: false,
-                    message: 'Playlists already exists in the library!'
-                })
+                    message: 'Playlist already exists in the library!'
+                });
             }
         }
 
-        await library.save();
+        await library.save(); // Lưu lại thay đổi
         return res.status(200).json({
             success: true,
-            message: 'Album added to library',
+            message: 'Library updated successfully.',
             data: library
         });
 
@@ -164,13 +232,10 @@ export const pushLibrary = async (req, res) => {
 
 export const removeFromLibrary = async (req, res) => {
     try {
-        const userId = req.user._id;
-        const { song, album, artist, playlist } = req.body;
+        const userId = req.user._id; // Lấy ID người dùng từ req
+        const { song, album, artist, playlist } = req.body; // Lấy thông tin từ body
+
         const library = await Library.findOne({ user: userId });
-        console.log("song", song)
-        console.log("album", album)
-        console.log("artist", artist)
-        console.log("playlist", playlist)
         if (!library) {
             return res.status(404).json({
                 success: false,
@@ -180,52 +245,62 @@ export const removeFromLibrary = async (req, res) => {
 
         // Xóa bài hát khỏi thư viện
         if (song) {
-            const songIndex = library.songs.findIndex(item => item.toString() === song.toString());
+            const songIndex = library.songs.findIndex(item => item.song.toString() === song.toString());
             if (songIndex > -1) {
                 library.songs.splice(songIndex, 1); // Xóa bài hát khỏi mảng songs
+            } else {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Song not found in library'
+                });
             }
         }
 
         // Xóa album khỏi thư viện
         if (album) {
-            const albumIndex = library.albums.findIndex(item => item.toString() === album.toString());
+            const albumIndex = library.albums.findIndex(item => item.album.toString() === album.toString());
             if (albumIndex > -1) {
                 library.albums.splice(albumIndex, 1); // Xóa album khỏi mảng albums
+            } else {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Album not found in library'
+                });
             }
         }
 
         // Xóa nghệ sĩ khỏi thư viện
         if (artist) {
-            const artistIndex = library.artistsFollow.findIndex(item => item.toString() === artist.toString());
+            const artistIndex = library.artistsFollow.findIndex(item => item.artist.toString() === artist.toString());
             if (artistIndex > -1) {
                 library.artistsFollow.splice(artistIndex, 1); // Xóa nghệ sĩ khỏi mảng artistsFollow
+            } else {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Artist not found in library'
+                });
             }
         }
 
         // Xóa playlist khỏi thư viện
         if (playlist) {
-            const playlistInDb = await Playlist.findById(playlist);
-            if (!playlistInDb) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Playlist not found in database',
-                });
-            }
-            const playlistIndex = library.playlists.findIndex(item => item.toString() === playlist.toString());
+            const playlistIndex = library.playlists.findIndex(item => item.playlist.toString() === playlist.toString());
             if (playlistIndex > -1) {
                 library.playlists.splice(playlistIndex, 1); // Xóa playlist khỏi mảng playlists
-
+            } else {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Playlist not found in library'
+                });
             }
-            await Playlist.findByIdAndDelete(playlist);
-            //xóa khỏi library cug xóa ra khỏi playlist
         }
 
-        await library.save();
+        await library.save(); // Lưu lại thay đổi
 
         return res.status(200).json({
             success: true,
             message: 'Item removed from library successfully',
-            data: library
+            data: library // Trả về thư viện đã được cập nhật
         });
 
     } catch (error) {
@@ -234,4 +309,4 @@ export const removeFromLibrary = async (req, res) => {
             message: error.message
         });
     }
-};
+}

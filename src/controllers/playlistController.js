@@ -1,12 +1,11 @@
 import Playlist from '../models/playlistModel.js';
-import Library from '../models/libraryModel.js';
+// import Library from '../models/libraryModel.js';
 import { v2 as cloudinary } from 'cloudinary';
 
 export const createPlaylist = async (req, res) => {
     try {
         const { name, songs, description, status } = req.body;
-        const userId = req.user._id; // Lấy userId từ JWT hoặc session
-
+        const userId = req.user._id;
         if (!name) {
             return res.status(400).json({
                 success: false,
@@ -42,14 +41,14 @@ export const createPlaylist = async (req, res) => {
         });
 
         // Lưu playlist vào DB
-        await newPlaylist.save();
-        const findLibrary = await Library.findOne({
-            user: userId
-        })
-        if (findLibrary) {
-            findLibrary.playlists.push(newPlaylist._id);
-            await findLibrary.save();
-        }
+        // await newPlaylist.save();
+        // const findLibrary = await Library.findOne({
+        //     user: userId
+        // })
+        // if (findLibrary) {
+        //     findLibrary.playlists.push(newPlaylist._id);
+        //     await findLibrary.save();
+        // }
         return res.status(201).json({
             success: true,
             message: "Playlist created successfully",
@@ -208,7 +207,7 @@ export const getPlaylistId = async (req, res) => {
 export const getPlaylist = async (req, res) => {
     try {
         // Tìm playlist theo ID, đồng thời populate các bài hát và người tạo playlist
-        const playlist = await Playlist.find({ user: req.user._id })
+        const playlist = await Playlist.find()
             .populate({
                 path: 'songs', // Populate 'songs'
                 select: '-downloadCount -viewCount -status',
